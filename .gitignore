@@ -1,0 +1,33 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Logs
+logs/
+*.log
+
+# Seed state
+seed-progress.json
+
+# Build output
+client/dist/
+client/build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# MongoDB dumps
+dump/
+
+HANDOFF.md
