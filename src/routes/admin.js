@@ -69,6 +69,59 @@ router.patch("/users/:id/reactivate", async (req, res) => {
   }
 });
 
+// ── POST /api/admin/coordinators/register ────────────────────────────────────
+router.post("/coordinators/register", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password)
+      return res.status(400).json({ error: "name, email, and password required" });
+
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(409).json({ error: "Email already registered" });
+
+    // Pass plain password — User model's pre-save hook hashes it automatically
+    const user = await User.create({ name, email, password, role: "coordinator" });
+
+    res.status(201).json({
+      success: true,
+      message: `Coordinator account created for ${email}`,
+      user: { _id: user._id, name: user.name, email: user.email, role: user.role }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /api/admin/users/:id/promote ───────────────────────────────────────
+router.patch("/users/:id/promote", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (user.role === "admin") return res.status(400).json({ error: "Cannot change role of an admin account" });
+    if (user.role === "coordinator") return res.status(400).json({ error: "User is already a coordinator" });
+    user.role = "coordinator";
+    await user.save();
+    res.json({ success: true, message: `${user.name} promoted to coordinator`, user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /api/admin/users/:id/demote ────────────────────────────────────────
+router.patch("/users/:id/demote", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (user.role === "admin") return res.status(400).json({ error: "Cannot change role of an admin account" });
+    if (user.role === "student") return res.status(400).json({ error: "User is already a student" });
+    user.role = "student";
+    await user.save();
+    res.json({ success: true, message: `${user.name} demoted to student`, user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/admin/papers/escalated ──────────────────────────────────────────
 // Papers coordinator escalated — admin makes final decision
 router.get("/papers/escalated", async (req, res) => {
@@ -134,7 +187,7 @@ router.patch("/papers/:paperId/score", async (req, res) => {
 // Read audit log — last N lines. Admin only.
 router.get("/audit", async (req, res) => {
   try {
-    const { lines = 100 } = req.query;
+    const { lines = 100, oldest = 'false' } = req.query;
     const logPath = path.join(__dirname, "../../logs/audit.log");
 
     if (!fs.existsSync(logPath))
@@ -142,7 +195,10 @@ router.get("/audit", async (req, res) => {
 
     const content = fs.readFileSync(logPath, "utf8");
     const allLines = content.trim().split("\n").filter(Boolean);
-    const lastN = allLines.slice(-parseInt(lines));
+    const limit = parseInt(lines)
+    const lastN = oldest === 'true'
+      ? allLines.slice(0, limit)
+      : allLines.slice(-limit);
 
     const entries = lastN.map((line) => {
       try { return JSON.parse(line); }

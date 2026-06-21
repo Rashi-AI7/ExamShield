@@ -24,7 +24,14 @@ const writeLog = (entry) => {
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
+const EXCLUDED_ROUTES = ['/api/admin/audit']
+
 const auditLogger = (req, res, next) => {
+  // Don't log audit log reads — prevents self-filling loop
+  if (EXCLUDED_ROUTES.some(r => req.originalUrl.startsWith(r))) {
+    return next()
+  }
+
   const startedAt = new Date();
 
   // Capture response status after it's sent

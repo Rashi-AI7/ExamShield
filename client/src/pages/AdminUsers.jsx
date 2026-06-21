@@ -10,6 +10,12 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true)
   const [actionMsg, setActionMsg] = useState('')
 
+  // Coordinator registration form
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const [formMsg, setFormMsg] = useState('')
+  const [formLoading, setFormLoading] = useState(false)
+
   const load = () => {
     setLoading(true)
     const params = roleFilter ? `?role=${roleFilter}` : ''
@@ -33,6 +39,26 @@ export default function AdminUsers() {
     }
   }
 
+  const registerCoordinator = async () => {
+    if (!form.name || !form.email || !form.password) {
+      setFormMsg('All fields required')
+      return
+    }
+    setFormLoading(true)
+    setFormMsg('')
+    try {
+      await api.post('/admin/coordinators/register', form)
+      setFormMsg(`✓ Coordinator account created for ${form.email}`)
+      setForm({ name: '', email: '', password: '' })
+      load()
+      setTimeout(() => { setFormMsg(''); setShowForm(false) }, 3000)
+    } catch (err) {
+      setFormMsg(err.response?.data?.error || 'Registration failed')
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
   const roleColor = (r) => r === 'admin' ? 'badge-danger' : r === 'coordinator' ? 'badge-amber' : 'badge-indigo'
 
   return (
@@ -42,9 +68,56 @@ export default function AdminUsers() {
         <div className={styles.topbar}>
           <div className={styles.topbarTitle}>User Management</div>
           <div className={styles.topbarSub}>{total} users total</div>
+          <button
+            className='btn-ghost'
+            style={{ marginLeft: 'auto' }}
+            onClick={() => setShowForm(s => !s)}
+          >
+            {showForm ? '✕ Cancel' : '+ Add Coordinator'}
+          </button>
         </div>
+
         <div className={styles.content}>
+
+          {/* Coordinator registration form */}
+          {showForm && (
+            <div className={styles.formCard}>
+              <div className={styles.formTitle}>Register New Coordinator</div>
+              <div className={styles.formRow}>
+                <input
+                  className={styles.formInput}
+                  placeholder='Full name'
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                />
+                <input
+                  className={styles.formInput}
+                  placeholder='Email address'
+                  type='email'
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                />
+                <input
+                  className={styles.formInput}
+                  placeholder='Temporary password'
+                  type='password'
+                  value={form.password}
+                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                />
+                <button
+                  className={styles.reactivate}
+                  onClick={registerCoordinator}
+                  disabled={formLoading}
+                >
+                  {formLoading ? 'Creating…' : 'Create Account'}
+                </button>
+              </div>
+              {formMsg && <div className={styles.actionMsg}>{formMsg}</div>}
+            </div>
+          )}
+
           {actionMsg && <div className={styles.actionMsg}>{actionMsg}</div>}
+
           <div className={styles.filters}>
             {['', 'student', 'coordinator', 'admin'].map(r => (
               <button key={r} className={`${styles.filterBtn} ${roleFilter === r ? styles.filterActive : ''}`}
@@ -53,6 +126,7 @@ export default function AdminUsers() {
               </button>
             ))}
           </div>
+
           <div className={styles.table}>
             <div className={styles.tableHead}>
               <span>Name</span><span>Email</span><span>Role</span><span>Joined</span><span>Status</span><span>Action</span>
@@ -65,10 +139,12 @@ export default function AdminUsers() {
                 <span className={styles.mono}>{new Date(u.createdAt).toLocaleDateString('en-IN')}</span>
                 <span><span className={`badge ${u.isActive ? 'badge-green' : 'badge-danger'}`}>{u.isActive ? 'active' : 'inactive'}</span></span>
                 <span>
-                  <button className={`${styles.actionBtn} ${u.isActive ? styles.deactivate : styles.reactivate}`}
-                    onClick={() => toggle(u)}>
-                    {u.isActive ? 'Deactivate' : 'Reactivate'}
-                  </button>
+                  {u.role !== 'admin' && (
+                    <button className={`${styles.actionBtn} ${u.isActive ? styles.deactivate : styles.reactivate}`}
+                      onClick={() => toggle(u)}>
+                      {u.isActive ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                  )}
                 </span>
               </div>
             ))}
